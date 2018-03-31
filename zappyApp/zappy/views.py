@@ -10,11 +10,12 @@ import tweepy
 from tweepy import OAuthHandler
 from tweepy import Stream
 from tweepy.streaming import StreamListener
- 
 from zappy.models import Tweet
+import json
+from django.http import HttpResponse
 
 SLACK_VERIFICATION_TOKEN = 'Nv9vArkIO0rYvmPUchCSKwvu'
-SLACK_BOOT_TOKEN = 'xoxb-338657963874-NOVPnjN7b43SzRKIN7aScbdq'
+SLACK_BOOT_TOKEN = 'xoxb-338657963874-CsYtuicEYhuapNvLVCl9iV2E'
 TWITTER_CONSUMER_KEY = 'DAJxuF8xaRVkx48CaZLIK65Zh'
 TWITTER_CONSUMER_SECRET = '6h3bCLNPkusVCyF4WhRPBMfxQJoYEvaOuyd7Lj6AsIQG6Zbi6x'
 TWITTER_ACCESS_TOKEN = '979516170255642626-mJcvmpmI0nxR1oZD2amfKIXAit9HV5j'
@@ -27,14 +28,14 @@ api = tweepy.API(auth)
 
 
 class Events(APIView):
-    twitter_stream = None
+    # twitter_stream = None
     def post(self, request, *args, **kwargs):
         slack_message = request.data
         
-        if not Events.twitter_stream:
-            Events.twitter_stream = Stream(api.auth,tweetListener())
-            Events.twitter_stream.userstream()
-            Events.twitter_stream.filter(track=sys.argv[1:])
+        # if not Events.twitter_stream:
+        #     Events.twitter_stream = Stream(api.auth,tweetListener())
+        #     Events.twitter_stream.userstream()
+        #     Events.twitter_stream.filter(track=sys.argv[1:])
         
         if slack_message.get('token') != SLACK_VERIFICATION_TOKEN:
             return Response(status=status.HTTP_403_FORBIDDEN)
@@ -59,33 +60,27 @@ class Events(APIView):
                                 channel=channel,                  
                                 text=bot_text)                    
                 
-                # tweets = tweepy.Cursor(api.home_timeline).items()
-                # for tweet in tweets:
-                #     # id = tweet.id                
-                #     newTweet = Tweet.objects(tweet_id = tweet.id)
-                #     if not newTweet:
-                #         newTweet = Tweet(tweet_id = tweet.id,tweet_text=tweet.text,tweet_time = tweet.created_at,tweet_user = tweet.author.screen_name,tweet_location = tweet.author.location)
-                #         newTweet.save()
-                #     else:
-                #         break
+                tweets = tweepy.Cursor(api.home_timeline).items()
+                for tweet in tweets:
+                    newTweet = Tweet.objects(tweet_id = tweet.id)
+                    if not newTweet:
+                        newTweet = Tweet(tweet_id = tweet.id,tweet_text=tweet.text,tweet_time = tweet.created_at,tweet_user = tweet.author.screen_name,tweet_location = tweet.author.location)
+                        newTweet.save()
+                    else:
+                        break
                
                 return Response(status=status.HTTP_200_OK)        
 
         return Response(status=status.HTTP_200_OK)
     
     def get(self,request,*args,**kwargs):       
-        tweets_res = []
-        tweets = Tweet.objects()
-        for tweet in tweets:
-            tweets_res.append({"text":tweet.tweet_text,"time":tweet.tweet_time})
-        return render(request,'base.html',{'tweets':tweets_res})
+       return render(request,'base.html',{})
 
 
-class tweetListener(StreamListener):
-    def on_status(self,data):
-        newTweet = Tweet(tweet_id = data.id,tweet_text=data.text,tweet_time = data.created_at,tweet_user = data.author.screen_name,tweet_location = data.author.location)
-        newTweet.save()
-    def on_error(self,error):
-        print error
-    def on_delete(self,data):
-        print data
+def getTweets(request):
+    tweets_res = []
+    tweets = Tweet.objects()
+    for tweet in tweets:
+        tweets_res.append({"text":tweet.tweet_text,"time":str(tweet.tweet_time)})
+
+    return HttpResponse(json.dumps(tweets_res))
